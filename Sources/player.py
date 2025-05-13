@@ -1,74 +1,56 @@
+
 import sys
 from queue import PriorityQueue
-
-import main
 import support_function as spf
-
-WHITE = (255, 0, 0)
 score = 0
+def print_board(board):
+    """In ma trận board một cách đẹp mắt."""
+    print("score:"+ str(score))
+    for row in board:
+        # Nối các ký tự trong hàng, thêm khoảng trắng để dễ đọc
+        print(' '.join(str(cell) for cell in row))
+    print()  # In dòng trống để phân tách các lần in
 
 
-def Player(board, list_check_point, pygame):
+def Player(board, list_check_point, direction=None):
     global score
     if spf.check_win(board, list_check_point):
         print("Found win")
+        score = 0 
         return True
     start_state = spf.state(board, None, list_check_point)
-    list_state = [start_state]
-    s_queue = PriorityQueue()
-    s_queue.put(start_state)
-    while not s_queue.empty():
-        now_state = s_queue.get()
-        cur_pos = spf.find_position_player(now_state.board)
-        list_can_move = spf.get_next_pos(now_state.board, cur_pos)
-        new_board = board
-        next_pos = cur_pos
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-            if event.type == pygame.KEYDOWN:
-                # if event.key == pygame.K_SPACE:  # Thoát ngay khi nhấn SPACE
-                #     return "EXIT"  # Giá trị đặc biệt để thoát
-                score += 1
-                if event.key == pygame.K_UP:
-                    next_pos = [cur_pos[0] - 1, cur_pos[1]]
+    cur_pos = spf.find_position_player(start_state.board)
+    list_can_move = spf.get_next_pos(start_state.board, cur_pos)
+    new_board = board
 
-                if event.key == pygame.K_DOWN:
-                    next_pos = [cur_pos[0] + 1, cur_pos[1]]
+    # If a direction is provided, process the move
+    if direction:
+        if direction == "UP":
+            next_pos = [cur_pos[0] - 1, cur_pos[1]]
+        elif direction == "DOWN":
+            next_pos = [cur_pos[0] + 1, cur_pos[1]]
+        elif direction == "LEFT":
+            next_pos = [cur_pos[0], cur_pos[1] - 1]
+        elif direction == "RIGHT":
+            next_pos = [cur_pos[0], cur_pos[1] + 1]
+        else:
+            return new_board  # No valid direction, return unchanged board
 
-                if event.key == pygame.K_LEFT:
-                    next_pos = [cur_pos[0], cur_pos[1] - 1]
-                    main.player_direction = "left"
-
-
-                if event.key == pygame.K_RIGHT:
-                    next_pos = [cur_pos[0], cur_pos[1] + 1]
-                    main.player_direction = "right"
-
-                if (check_map(list_can_move, next_pos) == 1):
-                    new_board = spf.move(now_state.board, next_pos, cur_pos, list_check_point)
-                    return new_board
-                new_state = spf.state(new_board, now_state, list_check_point)
-                if spf.check_win(new_board, list_check_point):
-                    print("Found win")
-                    return True
-                list_state.append(new_state)
-                s_queue.put(new_state)
-
-                # if event.key == pygame.K_SPACE:
-                #     main.sceneState = "init"
-                #     main.initGame(board)
-                #     return board
-
-        pygame.display.update()
-
+        if check_map(list_can_move, next_pos) == 1:
+            new_board = spf.move(start_state.board, next_pos, cur_pos, list_check_point)
+            score += 1
+            print("Board after move:")  # In trạng thái bảng sau mỗi di chuyển
+            print_board(new_board)
+            if spf.check_win(new_board, list_check_point):
+                print("Found win")
+                print("Movement:" + str(score))
+                score = 0
+                return True
     return new_board
-
 
 def check_map(list_can_move, move):
     isMove = 0
     for next_pos in list_can_move:
-        if (move[0] == next_pos[0] and move[1] == next_pos[1]):
+        if move[0] == next_pos[0] and move[1] == next_pos[1]:
             isMove = 1
     return isMove

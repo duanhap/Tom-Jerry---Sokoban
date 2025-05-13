@@ -129,7 +129,26 @@ def renderMap(board):
                     screen.blit(person, (j * 100 + indent, i * 100 + indent))
                 
 
-#def playerUpdateRender():
+def get_player_direction(current_board, prev_board):
+        """Xác định hướng di chuyển của nhân vật giữa hai trạng thái."""
+        if prev_board is None:  # Kiểm tra nếu không có trạng thái trước
+            return player_direction
+        # Tìm vị trí nhân vật trong current_board và prev_board
+        curr_pos = None
+        prev_pos = None
+        for i in range(len(current_board)):
+            for j in range(len(current_board[0])):
+                if current_board[i][j] == '@':
+                    curr_pos = [i, j]
+                if prev_board is not None and prev_board[i][j] == '@':
+                    prev_pos = [i, j]
+        # So sánh vị trí
+        if curr_pos and prev_pos:
+            if curr_pos[1] < prev_pos[1]:  # Di chuyển sang trái
+                return "left"
+            elif curr_pos[1] > prev_pos[1]:  # Di chuyển sang phải
+                return "right"
+        return player_direction  # Giữ nguyên nếu không di chuyển trái/phải
     
 
 
@@ -140,73 +159,132 @@ loading = False
 
 
 def sokoban():
-    running = True  # Biến điều khiển vòng lặp chính của trò chơi
-    global sceneState, list_check_point  # Biến toàn cục
+    running = True
+    global sceneState, list_check_point
     global loading
     global algorithm
-    global list_board
     global mapNumber
-    stateLenght = 0  # Biến cục bộ lưu độ dài trạng thái
-    currentState = 0  # Biến cục bộ lưu trạng thái hiện tại
+    global player_direction  # Ensure player_direction is accessible
+    state_history = []  # Danh sách lưu lịch sử trạng thái
+    stateLenght = 0
+    currentState = 0
     global list_board_win
+    list_board = None  # Initialize list_board
+    found = True
 
-    found = True  # Biến cục bộ để theo dõi trạng thái tìm thấy
-
-    while running:  # Vòng lặp chính của trò chơi
-        screen.blit(init_background, (0, 0))  # Vẽ nền ban đầu lên màn hình
+    while running:
+        screen.blit(init_background, (0, 0))
         if sceneState == "init":
-            initGame(maps[mapNumber])  # Khởi tạo trò chơi với bản đồ hiện tại
+            initGame(maps[mapNumber])
+            state_history = []  # Reset lịch sử khi bắt đầu lại
         if sceneState == "executing":
-            list_check_point = check_points[mapNumber]  # Lấy điểm kiểm tra từ bản đồ
-            # Chọn giữa người dùng chơi và máy chơi
+            list_check_point = check_points[mapNumber]
             if algorithm == "Player":
                 print("Player")
                 list_board = maps[mapNumber]
+                state_history = [list_board.copy()]  # Lưu trạng thái ban đầu
             else:
                 print("AStar")
                 list_board = astar.AStart_Search(maps[mapNumber], list_check_point)
 
             if len(list_board) > 0:
                 sceneState = "playing"
-                stateLenght = len(list_board[0])
+                stateLenght = len(list_board[0]) if algorithm == "AI" else 0
                 currentState = 0
             else:
                 sceneState = "end"
                 found = False
 
         if sceneState == "loading":
-            loadingGame()  # Hàm tải trò chơi
+            loadingGame()
             sceneState = "executing"
         if sceneState == "end":
             if algorithm == "Player":
-                foundGame(list_board) # Kết thúc trò chơi cho người chơi
-            else:
-                foundGame(list_board[0][stateLenght - 1]) # Kết thúc trò chơi cho AI
+                if found:  # Người chơi thắng
+                    foundGame(list_board)
+                else:  # Trường hợp thua (nếu có)
+                    font = pygame.font.Font('gameFont.ttf', 30)
+                    text = font.render("Game Over", True, (255, 0, 0))
+                    screen.blit(text, (screen.get_width() // 2 - 100, screen.get_height() // 2))
+                    pygame.display.flip()
+                    pygame.time.wait(2000)
+                    sceneState = "init"
+            else:  # Chế độ AI
+                if len(list_board) > 0 and stateLenght > 0 and found:
+                    foundGame(list_board[0][stateLenght - 1])
+                else:
+                    font = pygame.font.Font('gameFont.ttf', 30)
+                    text = font.render("No Solution Found", True, (255, 0, 0))
+                    screen.blit(text, (screen.get_width() // 2 - 100, screen.get_height() // 2))
+                    pygame.display.flip()
+                    pygame.time.wait(2000)
+                    sceneState = "init"
 
         if sceneState == "playing":
-            clock.tick(4) # Điều chỉnh tốc độ trò chơi
+            clock.tick(4)
             if algorithm == "Player":
-                new_list_board = player.Player(list_board, list_check_point, pygame)
-                # 🛑 Nếu sceneState bị đổi trong Player (vd: nhấn SPACE), thì dừng chơi
-                if sceneState != "playing":
-                    return  # hoặc break, tùy theo context bạn đặt đoạn này trong hàm nào
+                UIPlayer()
+                direction = None  # Initialize direction for player movement
+                # Event handling moved here
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        running = False
+                    if event.type == pygame.KEYDOWN:
+                        if event.key == pygame.K_SPACE:
+                            sceneState = "init"
+                            initGame(maps[mapNumber])
+                            state_history = []  # Reset lịch sử khi quay lại menu
+                            break  # Exit event loop to prevent further processing
+                        if event.key == pygame.K_UP:
+                            direction = "UP"
+                        if event.key == pygame.K_DOWN:
+                            direction = "DOWN"
+                        if event.key == pygame.K_LEFT:
+                            direction = "LEFT"
+                            player_direction = "left"
+                        if event.key == pygame.K_RIGHT:
+                            direction = "RIGHT"
+                            player_direction = "right"
+                        if event.key == pygame.K_z:  # Phím Z để undo
+                            if len(state_history) > 1:  # Đảm bảo có trạng thái trước đó
+                                state_history.pop()  # Xóa trạng thái hiện tại
+                                list_board = state_history[-1].copy()  # Lấy trạng thái trước
+                                list_board_win = list_board
+                                #import player
+                                player.score -= 1  # Giảm score khi undo
+                                break
 
-                list_board = new_list_board
-                if np.all(list_board == True):
-                    sceneState = "end"
-                    list_board = list_board_win
-                    found = True
+                if direction:
+                    state_history.append(list_board.copy())
+                    new_list_board = player.Player(list_board, list_check_point, direction)
+                    if new_list_board is True:
+                        sceneState = "end"
+                        list_board = list_board_win
+                        found = True
+                    else:
+                        list_board = new_list_board
+                        list_board_win = list_board
+                    renderMap(list_board)
                 else:
                     renderMap(list_board)
-                    list_board_win = list_board
 
             if algorithm == "AI":
-                renderMap(list_board[0][currentState])
-                currentState = currentState + 1
-            if currentState == stateLenght:
-                sceneState = "end"
-                found = True
-        for event in pygame.event.get(): # Xử lý các sự kiện người dùng
+                UIAI(currentState)
+                if len(list_board) > 0 and currentState < stateLenght:  # Kiểm tra trước khi truy cập
+                    prev_board = list_board[0][currentState - 1] if currentState > 0 else None
+                    player_direction = get_player_direction(list_board[0][currentState], prev_board)
+                    #print(f"Current state: {currentState}, player_direction: {player_direction}")
+                    renderMap(list_board[0][currentState])
+                    currentState = currentState + 1
+                    if currentState == stateLenght:
+                        sceneState = "end"
+                        found = True
+                else:
+                    sceneState = "end"
+                    found = False
+
+        # Existing event handling for init and end states
+        for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             if event.type == pygame.KEYDOWN:
@@ -221,19 +299,55 @@ def sokoban():
                         sceneState = "loading"
                     if sceneState == "end":
                         sceneState = "init"
-                # Nhấn phím SPACE để chuyển đổi thuật toán
                 if event.key == pygame.K_SPACE and sceneState == "init":
                     if algorithm == "Player":
                         algorithm = "AI"
                     else:
                         algorithm = "Player"
-                if event.key == pygame.K_SPACE and sceneState == "playing":
+                if event.key == pygame.K_SPACE and sceneState == "playing" and algorithm =="AI":
                     initGame(maps[mapNumber])
                     sceneState = "init"
 
         pygame.display.flip()
     pygame.quit()
 
+# ... (rest of main.py remains unchanged)
+
+def UIPlayer():
+    titleMoveSize = pygame.font.Font('gameFont.ttf', 30)
+    titleMoveText = titleMoveSize.render(str('Movement'), True, WHITE)
+    titleMoveRect = titleMoveText.get_rect(center=(1250, 340))  # căn chỉnh A star search
+    screen.blit(titleMoveText, titleMoveRect)
+
+    MoveSize = pygame.font.Font('gameFont.ttf', 80)
+    MoveText = MoveSize.render(str(player.score), True, RED)
+    MoveRect = MoveText.get_rect(center=(1250, 440))  # căn chỉnh A star search
+    screen.blit(MoveText, MoveRect)
+
+    titleUndoSize = pygame.font.Font('gameFont.ttf', 30)
+    titleUndoText = titleUndoSize.render(str('Press Z to Undo!!'), True, WHITE)
+    titleUndoRect = titleUndoText.get_rect(center=(1250, 640))  # căn chỉnh A star search
+    screen.blit(titleUndoText, titleUndoRect)
+
+    titleMenuSize = pygame.font.Font('gameFont.ttf', 30)
+    titleMenuText = titleMenuSize.render(str('Press Space to return menu !!'), True, WHITE)
+    titleMenuRect = titleMenuText.get_rect(center=(700, 1050))  # căn chỉnh A star search
+    screen.blit(titleMenuText, titleMenuRect)
+def UIAI(state):
+    titleMoveSize = pygame.font.Font('gameFont.ttf', 30)
+    titleMoveText = titleMoveSize.render(str('Movement'), True, WHITE)
+    titleMoveRect = titleMoveText.get_rect(center=(1250, 340))  # căn chỉnh A star search
+    screen.blit(titleMoveText, titleMoveRect)
+
+    MoveSize = pygame.font.Font('gameFont.ttf', 80)
+    MoveText = MoveSize.render(str(state), True, RED)
+    MoveRect = MoveText.get_rect(center=(1250, 440))  # căn chỉnh A star search
+    screen.blit(MoveText, MoveRect)
+
+    titleMenuSize = pygame.font.Font('gameFont.ttf', 30)
+    titleMenuText = titleMenuSize.render(str('Press Space to return menu !!'), True, WHITE)
+    titleMenuRect = titleMenuText.get_rect(center=(700, 1050))  # căn chỉnh A star search
+    screen.blit(titleMenuText, titleMenuRect)
 
 def initGame(map):
     titleSize = pygame.font.Font('gameFont.ttf', 60)
