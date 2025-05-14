@@ -171,8 +171,12 @@ def sokoban():
     global list_board_win
     list_board = None  # Initialize list_board
     found = True
+    
 
     while running:
+        # Phát nhạc nền
+        
+
         screen.blit(init_background, (0, 0))
         if sceneState == "init":
             initGame(maps[mapNumber])
@@ -350,6 +354,7 @@ def UIAI(state):
     screen.blit(titleMenuText, titleMenuRect)
 
 def initGame(map):
+    
     titleSize = pygame.font.Font('gameFont.ttf', 60)
     titleText = titleSize.render('Tom & Jerry - Sokoban', True, WHITE)
     titleRect = titleText.get_rect(center=(700, 70))
@@ -419,6 +424,37 @@ def notfoundGame(notfound_background=None):
 
 
 def main():
+    music_path = os.path.join(os.getcwd(), 'musicsokoban.mp3')
+    pygame.mixer.init()
+    pygame.mixer.music.load(music_path)
+    pygame.mixer.music.play(-1)  # Lặp lại vô hạn
+    pygame.mixer.music.set_volume(0.2)  # Điều chỉnh âm lượng
+     # Tải ảnh intro
+    intro_image = pygame.image.load(os.path.join(os.getcwd(), 'intro.png'))
+    intro_image = pygame.transform.scale(intro_image, (1500, 1100))
+
+    # Tạo surface màu đen để làm lớp phủ
+    fade_surface = pygame.Surface((1500, 1100))
+    fade_surface.fill((0, 0, 0))
+
+    # FADE IN: từ đen đến sáng
+    for alpha in range(255, -1, -5):  # giảm độ mờ từ 255 -> 0
+        screen.blit(intro_image, (0, 0))
+        fade_surface.set_alpha(alpha)
+        screen.blit(fade_surface, (0, 0))
+        pygame.display.update()
+        pygame.time.delay(30)
+
+    # Chờ 2 giây khi đã hiện rõ ảnh
+    pygame.time.delay(3000)
+
+    # FADE OUT: từ sáng đến đen
+    for alpha in range(0, 256, 5):  # tăng độ mờ từ 0 -> 255
+        screen.blit(intro_image, (0, 0))
+        fade_surface.set_alpha(alpha)
+        screen.blit(fade_surface, (0, 0))
+        pygame.display.update()
+        pygame.time.delay(50)
     sokoban()
 
 
